@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>2FA Code Autofill</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="container">
+            <h1>2FA Code Autofill</h1>
+            <div id="status-container">
+                <p>Status: <span id="auth-status">Checking...</span></p>
+            </div>
+            <div id="auth-container">
+                <button id="auth-button" class="button">
+                    Authenticate with Gmail
+                </button>
+            </div>
+            <div id="info-container">
+                <p>This extension will:</p>
+                <ul>
+                    <li>Detect 2FA code input fields</li>
+                    <li>Search your Gmail for verification codes</li>
+                    <li>Offer to autofill detected codes</li>
+                </ul>
+                <p class="note">
+                    Your Gmail data is only accessed when a 2FA field is
+                    detected.
+                </p>
+            </div>
+        </div>
+        <script src="popup.js"></script>
+    </body>
+</html>
