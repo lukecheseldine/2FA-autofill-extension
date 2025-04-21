@@ -77,8 +77,8 @@ function authenticateUser() {
 // Search Gmail for authentication codes
 async function findAuthCodeInGmail(domain) {
     try {
-        // Search for recent emails that might contain auth codes
-        const query = `from:(${domain}) OR subject:(verification code) OR subject:(security code) OR subject:(authentication) newer_than:1d`;
+        // Search for recent emails that might contain auth codes (last 10 minutes)
+        const query = `from:(${domain}) OR subject:(verification code) OR subject:(security code) OR subject:(authentication) newer_than:10m`;
         const encodedQuery = encodeURIComponent(query);
 
         // Search for messages
@@ -125,9 +125,13 @@ async function findAuthCodeInGmail(domain) {
 
         // Look for common 2FA code patterns (4-8 digits)
         const codeMatch =
-            body.match(/(?:code|pin|passcode)[^\d]*(\d{4,8})/i) ||
+            body.match(
+                /(?:code|pin|passcode|verification|auth)[^\d]*(\d{4,8})[^\d]/i
+            ) ||
             body.match(/(\d{6})[^\d]/) ||
-            body.match(/(\d{4,8})/);
+            body.match(/verification code:?\s*(\d{4,8})/i) ||
+            body.match(/security code:?\s*(\d{4,8})/i) ||
+            body.match(/one-?time code:?\s*(\d{4,8})/i);
 
         return codeMatch ? codeMatch[1] : null;
     } catch (error) {

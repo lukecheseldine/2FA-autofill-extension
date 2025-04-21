@@ -65,28 +65,56 @@ function handleTFAFields(fields) {
     // Get the current domain to help with email search
     const domain = window.location.hostname;
 
-    // Request auth code from background script
-    chrome.runtime.sendMessage(
-        { action: "findAuthCode", domain: domain },
-        (response) => {
-            if (chrome.runtime.lastError) {
-                console.error("Error:", chrome.runtime.lastError);
-                return;
-            }
+    // Keep track of polling
+    let pollingInterval;
 
-            if (response.success && response.code) {
-                // Create a suggestion UI
-                showCodeSuggestion(fields[0], response.code);
-            } else if (response.message === "Not authenticated") {
-                // Show authentication prompt
-                showAuthPrompt(fields[0]);
+    // Function to request auth code
+    function requestAuthCode() {
+        chrome.runtime.sendMessage(
+            { action: "findAuthCode", domain: domain },
+            (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error:", chrome.runtime.lastError);
+                    return;
+                }
+
+                if (response.success && response.code) {
+                    // Create a suggestion UI
+                    showCodeSuggestion(fields[0], response.code, () => {
+                        // When suggestion is dismissed, stop polling
+                        clearInterval(pollingInterval);
+                    });
+                    // Stop polling once we find a code
+                    clearInterval(pollingInterval);
+                } else if (response.message === "Not authenticated") {
+                    // Show authentication prompt
+                    showAuthPrompt(fields[0]);
+                    // Stop polling if not authenticated
+                    clearInterval(pollingInterval);
+                }
             }
+        );
+    }
+
+    // Initial request
+    requestAuthCode();
+
+    // Start polling every 5 seconds
+    pollingInterval = setInterval(() => {
+        // Check if field is still in the DOM
+        if (!document.body.contains(fields[0])) {
+            clearInterval(pollingInterval);
+            return;
         }
-    );
+        requestAuthCode();
+    }, 5000);
+
+    // Store the interval ID on the field to clean up later if needed
+    fields[0].tfaPollingInterval = pollingInterval;
 }
 
 // Show a suggestion UI to autofill the code
-function showCodeSuggestion(field, code) {
+function showCodeSuggestion(field, code, onDismiss) {
     // Create suggestion element
     const suggestion = document.createElement("div");
     suggestion.className = "tfa-autofill-suggestion";
@@ -119,23 +147,31 @@ function showCodeSuggestion(field, code) {
     // Add to page
     document.body.appendChild(suggestion);
 
+    // Function to handle dismissal
+    const handleDismiss = () => {
+        suggestion.remove();
+        if (typeof onDismiss === "function") {
+            onDismiss();
+        }
+    };
+
     // Add event listeners
     document
         .getElementById("tfa-autofill-btn")
         .addEventListener("click", () => {
             field.value = code;
             field.dispatchEvent(new Event("input", { bubbles: true }));
-            suggestion.remove();
+            handleDismiss();
         });
 
-    document.getElementById("tfa-dismiss-btn").addEventListener("click", () => {
-        suggestion.remove();
-    });
+    document
+        .getElementById("tfa-dismiss-btn")
+        .addEventListener("click", handleDismiss);
 
     // Auto-remove after 30 seconds
     setTimeout(() => {
         if (document.body.contains(suggestion)) {
-            suggestion.remove();
+            handleDismiss();
         }
     }, 30000);
 }
